@@ -18,11 +18,10 @@ El proyecto consiste en una serie de cuadernos Jupyter (`.ipynb`) pensados para 
 ## Estructura del repositorio
 
 - `main.ipynb`: Cuaderno principal con la solución base.
-- Otros cuadernos pueden añadirse a medida que avance el proyecto.
 
 ## Autores
 
-- [Tu nombre o usuario]
+- Jiasheng Liu
 
 ## Instrucciones de uso
 
