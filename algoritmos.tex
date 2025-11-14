@@ -1,0 +1,129 @@
+\documentclass[a4paper,12pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath, amssymb}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{float}
+
+\title{Algoritmos de Control y Aprendizaje por Refuerzo}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section*{On-policy first-visit MC control (para políticas $\varepsilon$-soft)}
+
+\begin{algorithm}[H]
+\caption{On-policy first-visit MC control (para $\varepsilon$-soft policies), estima $\pi \approx \pi_\ast$}
+\begin{algorithmic}
+\Require pequeño $\varepsilon > 0$
+\State Inicializar:
+\State \hspace{0.5cm} $\pi \leftarrow$ una política $\varepsilon$-soft arbitraria
+\State \hspace{0.5cm} $Q(s,a) \in \mathbb{R}$ (arbitrario), para todo $s \in \mathcal{S}, a \in \mathcal{A}(s)$
+\State \hspace{0.5cm} $\mathrm{Returns}(s,a) \leftarrow$ lista vacía, para todo $s \in \mathcal{S}, a \in \mathcal{A}(s)$
+
+\Repeat
+    \State Generar un episodio siguiendo $\pi$: $S_0, A_0, R_1, \ldots, S_{T-1}, A_{T-1}, R_T$
+    \State $G \leftarrow 0$
+    \For{$t = T-1, T-2, \ldots, 0$}
+        \State $G \leftarrow \gamma G + R_{t+1}$
+        \If{el par $(S_t, A_t)$ no aparece en $(S_0,A_0), (S_1,A_1), \ldots, (S_{t-1}, A_{t-1})$}
+            \State Añadir $G$ a $\mathrm{Returns}(S_t, A_t)$
+            \State $Q(S_t, A_t) \leftarrow \text{promedio}(\mathrm{Returns}(S_t, A_t))$
+            \State $A^\ast \leftarrow \arg\max_{a} Q(S_t, a)$ (desempate arbitrario)
+            \ForAll{$a \in \mathcal{A}(S_t)$}
+                \State 
+                $\pi(a|S_t) \leftarrow 
+                \begin{cases}
+                1 - \varepsilon + \varepsilon / |\mathcal{A}(S_t)|, & \text{si } a = A^\ast \\[2ex]
+                \varepsilon / |\mathcal{A}(S_t)|, & \text{si } a \neq A^\ast
+                \end{cases}$
+            \EndFor
+        \EndIf
+    \EndFor
+\Until para siempre
+\end{algorithmic}
+\end{algorithm}
+
+\section*{Double Q-learning}
+
+\begin{algorithm}[H]
+\caption{Double Q-learning, para estimar $Q_1 \approx Q_2 \approx q_\ast$}
+\begin{algorithmic}
+\Require tasa de aprendizaje $\alpha \in (0,1]$, pequeño $\varepsilon > 0$
+\State Inicializar $Q_1(s,a)$ y $Q_2(s,a)$ para todo $s \in \mathcal{S}^+, a \in \mathcal{A}(s)$, tal que $Q(\text{terminal},\cdot)=0$
+
+\Loop \textbf{por cada episodio}
+    \State Inicializar $S$
+    \Loop \textbf{por cada paso del episodio}
+        \State Elegir $A$ desde $S$ usando la política $\varepsilon$-greedy en $Q_1 + Q_2$
+        \State Tomar acción $A$, observar $R$ y $S'$
+        \State Con probabilidad $0.5$:
+        \[
+            Q_1(S,A) \leftarrow Q_1(S,A) 
+            + \alpha \Big( R + \gamma Q_2\big(S', \arg\max_a Q_1(S',a)\big) - Q_1(S,A) \Big)
+        \]
+        \State si no:
+        \[
+            Q_2(S,A) \leftarrow Q_2(S,A) 
+            + \alpha \Big( R + \gamma Q_1\big(S', \arg\max_a Q_2(S',a)\big) - Q_2(S,A) \Big)
+        \]
+        \State $S \leftarrow S'$
+    \EndLoop
+\Until $S$ es terminal
+\end{algorithmic}
+\end{algorithm}
+
+\section*{$n$-step Sarsa}
+
+\begin{algorithm}[H]
+\caption{$n$-step Sarsa para estimar $Q \approx q_\ast$ o $q_\pi$}
+\begin{algorithmic}
+\State Inicializar $Q(s,a)$ arbitrariamente, para todo $s \in \mathcal{S}, a \in \mathcal{A}$
+\State Inicializar $\pi$ como $\varepsilon$-greedy respecto a $Q$, o como una política fija dada
+\State Parámetros del algoritmo: tasa de aprendizaje $\alpha \in (0,1]$, pequeño $\varepsilon > 0$, entero positivo $n$
+\State Todas las operaciones de almacenamiento/acceso (para $S_t, A_t, R_t$) usan indexado módulo $n+1$
+
+\Loop \textbf{por cada episodio}
+    \State Inicializar y almacenar $S_0 \neq$ terminal
+    \State Seleccionar y almacenar una acción $A_0 \sim \pi(\cdot|S_0)$
+    \State $T \gets \infty$
+    \For{$t = 0, 1, 2, \ldots$}
+        \If{$t < T$}
+            \State Tomar acción $A_t$
+            \State Observar y almacenar $R_{t+1}$ y siguiente estado $S_{t+1}$
+            \If{$S_{t+1}$ es terminal}
+                \State $T \gets t + 1$
+            \Else
+                \State Seleccionar y almacenar $A_{t+1} \sim \pi(\cdot|S_{t+1})$
+            \EndIf
+        \EndIf
+
+        \State $\tau \gets t - n + 1$ \hfill (tiempo cuyo estimado se actualiza)
+
+        \If{$\tau \ge 0$}
+            \State $G \gets \displaystyle \sum_{i=\tau+1}^{\min(\tau+n, T)} \gamma^{\,i-\tau-1} R_i$
+            \If{$\tau + n < T$}
+                \State $G \gets G + \gamma^n Q(S_{\tau+n}, A_{\tau+n})$
+                \hfill $(G_{\tau:\tau+n})$
+            \EndIf
+            \State $Q(S_\tau, A_\tau) \gets 
+                    Q(S_\tau, A_\tau) + \alpha \left( G - Q(S_\tau, A_\tau) \right)$
+
+            \If{$\pi$ está siendo aprendida}
+                \State Asegurar que $\pi(\cdot|S_\tau)$ es $\varepsilon$-greedy respecto a $Q$
+            \EndIf
+        \EndIf
+        
+        \If{$\tau = T - 1$}
+            \State \textbf{break}
+        \EndIf
+    \EndFor
+\EndLoop
+\end{algorithmic}
+\end{algorithm}
+
+\end{document}
